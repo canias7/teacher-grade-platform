@@ -1,0 +1,118 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Teacher Gradebook</title>
+<style>
+  body { font-family: sans-serif; max-width: 640px; margin: 2em auto; padding: 0 1em; }
+  table { border-collapse: collapse; width: 100%; }
+  td, th { border: 1px solid #ccc; padding: 4px 8px; text-align: left; }
+  input[type=number] { width: 5em; }
+  .err { color: #b00; } .ok { color: #070; }
+</style>
+</head>
+<body>
+<h1>Teacher Gradebook</h1>
+
+<div id="login" hidden>
+  <form id="loginForm">
+    <p><input id="email" type="email" placeholder="Email" required></p>
+    <p><input id="password" type="password" placeholder="Password" required></p>
+    <button type="submit">Log in</button>
+  </form>
+  <p>Test accounts: <code>teacher1@school.test</code> / <code>teacher1pass</code>,
+     <code>teacher2@school.test</code> / <code>teacher2pass</code></p>
+</div>
+
+<div id="app" hidden>
+  <p>Logged in as <b id="who"></b> <button id="logout">Log out</button></p>
+  <table>
+    <thead><tr><th>Student</th><th>Subject</th><th>Grade (0-100)</th><th></th></tr></thead>
+    <tbody id="rows"></tbody>
+  </table>
+</div>
+
+<p id="msg"></p>
+
+<script>
+// Public (publishable) Supabase key: it can only call the gb_* functions,
+// which check the teacher's session token server-side.
+const API = 'https://gezrztmxyxbtbbasvbix.supabase.co/rest/v1/rpc/';
+const KEY = 'sb_publishable_7cNwGYry3xq_-zboLS8RTQ_IVLHRiA6';
+const $ = id => document.getElementById(id);
+
+async function rpc(fn, args) {
+  const r = await fetch(API + fn, {
+    method: 'POST',
+    headers: { apikey: KEY, 'Content-Type': 'application/json' },
+    body: JSON.stringify(args),
+  });
+  const text = await r.text();
+  const data = text ? JSON.parse(text) : null;
+  if (!r.ok) throw new Error((data && data.message) || r.statusText);
+  return data;
+}
+
+function msg(text, cls) { $('msg').textContent = text; $('msg').className = cls || ''; }
+function session() { try { return JSON.parse(localStorage.getItem('gb_session')); } catch (e) { return null; } }
+function showLogin() { $('login').hidden = false; $('app').hidden = true; $('rows').innerHTML = ''; }
+
+async function showApp() {
+  const s = session();
+  if (!s) return showLogin();
+  try {
+    const students = await rpc('gb_my_students', { p_token: s.token });
+    $('who').textContent = s.name + ' (' + s.email + ')';
+    $('rows').innerHTML = '';
+    for (const st of students) {
+      const tr = document.createElement('tr');
+      tr.innerHTML = '<td></td><td></td><td><input type="number" min="0" max="100" step="1"></td><td><button>Save</button></td>';
+      tr.cells[0].textContent = st.name;
+      tr.cells[1].textContent = st.subject;
+      const input = tr.querySelector('input');
+      input.value = st.grade ?? '';
+      tr.querySelector('button').onclick = async () => {
+        const grade = input.value === '' ? null : Number(input.value);
+        try {
+          await rpc('gb_set_grade', { p_token: s.token, p_student_id: st.id, p_grade: grade });
+          msg('Saved ' + st.name + ': ' + grade, 'ok');
+        } catch (e) {
+          msg(e.message, 'err');
+          if (e.message === 'Not logged in') { localStorage.removeItem('gb_session'); showLogin(); }
+        }
+      };
+      $('rows').appendChild(tr);
+    }
+    $('login').hidden = true;
+    $('app').hidden = false;
+  } catch (e) {
+    localStorage.removeItem('gb_session');
+    msg(e.message, 'err');
+    showLogin();
+  }
+}
+
+$('loginForm').onsubmit = async ev => {
+  ev.preventDefault();
+  try {
+    const s = await rpc('gb_login', { p_email: $('email').value, p_password: $('password').value });
+    localStorage.setItem('gb_session', JSON.stringify(s));
+    $('password').value = '';
+    msg('');
+    await showApp();
+  } catch (e) { msg(e.message, 'err'); }
+};
+
+$('logout').onclick = async () => {
+  const s = session();
+  localStorage.removeItem('gb_session');
+  showLogin();
+  msg('Logged out', 'ok');
+  if (s) try { await rpc('gb_logout', { p_token: s.token }); } catch (e) {}
+};
+
+showApp();
+</script>
+</body>
+</html>
