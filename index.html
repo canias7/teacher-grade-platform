@@ -36,17 +36,15 @@
 <p id="msg"></p>
 
 <script>
-// Public (publishable) Supabase key: it can only call the gb_* functions,
-// which check the teacher's session token server-side.
-const API = 'https://gezrztmxyxbtbbasvbix.supabase.co/rest/v1/rpc/';
-const KEY = 'sb_publishable_7cNwGYry3xq_-zboLS8RTQ_IVLHRiA6';
+// All data goes through our backend API (Cloudflare Worker), which talks to the database.
+const API = 'https://teacher-grade-api.aniascapital.workers.dev/api/';
 const $ = id => document.getElementById(id);
 
-async function rpc(fn, args) {
-  const r = await fetch(API + fn, {
-    method: 'POST',
-    headers: { apikey: KEY, 'Content-Type': 'application/json' },
-    body: JSON.stringify(args),
+async function api(method, path, body, token) {
+  const r = await fetch(API + path, {
+    method,
+    headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: 'Bearer ' + token } : {}) },
+    body: body ? JSON.stringify(body) : undefined,
   });
   const text = await r.text();
   const data = text ? JSON.parse(text) : null;
@@ -62,7 +60,7 @@ async function showApp() {
   const s = session();
   if (!s) return showLogin();
   try {
-    const students = await rpc('gb_my_students', { p_token: s.token });
+    const students = await api('GET', 'students', null, s.token);
     $('who').textContent = s.name + ' (' + s.email + ')';
     $('rows').innerHTML = '';
     for (const st of students) {
@@ -75,7 +73,7 @@ async function showApp() {
       tr.querySelector('button').onclick = async () => {
         const grade = input.value === '' ? null : Number(input.value);
         try {
-          await rpc('gb_set_grade', { p_token: s.token, p_student_id: st.id, p_grade: grade });
+          await api('PUT', 'students/' + st.id + '/grade', { grade }, s.token);
           msg('Saved ' + st.name + ': ' + grade, 'ok');
         } catch (e) {
           msg(e.message, 'err');
@@ -96,7 +94,7 @@ async function showApp() {
 $('loginForm').onsubmit = async ev => {
   ev.preventDefault();
   try {
-    const s = await rpc('gb_login', { p_email: $('email').value, p_password: $('password').value });
+    const s = await api('POST', 'login', { email: $('email').value, password: $('password').value });
     localStorage.setItem('gb_session', JSON.stringify(s));
     $('password').value = '';
     msg('');
@@ -109,7 +107,7 @@ $('logout').onclick = async () => {
   localStorage.removeItem('gb_session');
   showLogin();
   msg('Logged out', 'ok');
-  if (s) try { await rpc('gb_logout', { p_token: s.token }); } catch (e) {}
+  if (s) try { await api('POST', 'logout', null, s.token); } catch (e) {}
 };
 
 showApp();

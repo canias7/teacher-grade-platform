@@ -1,0 +1,8 @@
+{
+  "name": "teacher-grade-api",
+  "main": "src/index.js",
+  "compatibility_date": "2026-09-01",
+  "compatibility_flags": ["nodejs_compat"],
+  // Hyperdrive config pointing at the Supabase Postgres database (credentials stored in Cloudflare, not here).
+  "hyperdrive": [{ "binding": "HYPERDRIVE", "id": "847ba94930ec491593681afd0b2e97cc" }]
+}

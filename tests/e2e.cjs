@@ -1,10 +1,12 @@
 // End-to-end test in a real browser.
 // Usage: NODE_PATH=$(npm root -g) node tests/e2e.cjs [url]
-// With no url, the local index.html is served (the Supabase backend is still real).
+// With no url, the local index.html is served at the live URL (so the API's CORS check sees the real origin);
+// the backend API and database are always the real ones.
 const { chromium } = require('playwright');
 const assert = require('assert');
 
-const URL = process.argv[2] || 'http://gradebook.test/';
+const LIVE = 'https://canias7.github.io/teacher-grade-platform/';
+const URL = process.argv[2] || LIVE;
 
 (async () => {
   const proxy = process.env.HTTPS_PROXY ? { server: process.env.HTTPS_PROXY } : undefined;
@@ -16,7 +18,7 @@ const URL = process.argv[2] || 'http://gradebook.test/';
     await page.route(/^https:\/\//, async r => r.fulfill({ response: await r.fetch() }));
   }
   if (!process.argv[2]) {
-    await page.route('http://gradebook.test/**', r => r.fulfill({ path: __dirname + '/../index.html', contentType: 'text/html' }));
+    await page.route(LIVE, r => r.fulfill({ path: __dirname + '/../index.html', contentType: 'text/html' }));
   }
   const login = async (email, pw) => {
     await page.fill('#email', email);
