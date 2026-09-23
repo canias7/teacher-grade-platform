@@ -13,16 +13,24 @@ A small teacher gradebook. Teachers log in, see only their own students, and cha
 
 ## How it works
 
-- **Frontend:** a single static page, `index.html`, served by GitHub Pages. It has no build step.
-- **Database:** Supabase Postgres (free). Everything lives in its own `gradebook` schema, which the public API doesn't expose: `teachers`, `students`, `sessions`.
-- **Auth:** passwords are hashed with bcrypt (`pgcrypto`). `gb_login` checks the password and returns a random session token that is valid for 12 hours. `gb_logout` deletes the token.
-- **Isolation:** the browser can only call four `SECURITY DEFINER` functions: `gb_login`, `gb_logout`, `gb_my_students` and `gb_set_grade`. Each one turns the token into a teacher id on the server and filters on `teacher_id`. A teacher can't read or change another teacher's students, and the tables can't be queried directly.
+```
+Browser (index.html on GitHub Pages)
+   → Backend API: Cloudflare Worker  https://teacher-grade-api.aniascapital.workers.dev  (worker/)
+   → Database: Supabase Postgres, schema "gradebook" (reached through Cloudflare Hyperdrive)
+```
+
+- **Frontend:** a single static page, `index.html`, served by GitHub Pages. It only calls the backend API and has no database URL or key.
+- **Backend API** (`worker/src/index.js`): `POST /api/login`, `GET /api/students`, `PUT /api/students/:id/grade`, `POST /api/logout`. It connects to Postgres as the `gradebook_api` role, which can only use the three `gradebook` tables.
+- **Database:** tables `gradebook.teachers`, `gradebook.students` and `gradebook.sessions`. The public Supabase API doesn't expose this schema.
+- **Auth:** passwords are stored as bcrypt hashes. On login, the Worker has Postgres check the password with `pgcrypto`, then stores a random session token that expires after 12 hours. Every other request resolves the token to a teacher on the server and filters on `teacher_id`, so a teacher can't read or change another teacher's students.
 
 ## Setup from scratch
 
-1. Run `db/schema.sql`, then `db/seed.sql`, in the Supabase SQL editor.
-2. Put your project URL and publishable key in `index.html` (`API` / `KEY`).
-3. Host `index.html` anywhere static, e.g. GitHub Pages.
+1. Run `db/schema.sql`, then `db/seed.sql`, in the Supabase SQL editor. Set a password for the `gradebook_api` role.
+2. Deploy the Worker from `worker/`:
+   - `npx wrangler hyperdrive create teacher-grade-db --connection-string="postgres://gradebook_api:<password>@db.<project-ref>.supabase.co:5432/postgres"`
+   - Put the Hyperdrive id in `wrangler.jsonc`, then run `npx wrangler deploy`.
+3. Put the Worker URL in `index.html` (`API`), and host the page anywhere static, e.g. GitHub Pages.
 
 ## Test
 
