@@ -26,4 +26,4 @@ A small teacher gradebook. Teachers log in, see only their own students, and cha
 
 ## Test
 
-`node tests/e2e.mjs [url]` drives a real browser. It logs in, changes a grade, refreshes, logs out and back in, and checks that each teacher only sees their own students.
+`NODE_PATH=$(npm root -g) node tests/e2e.cjs [url]` drives a real browser. It logs in, changes a grade, refreshes, logs out and back in, and checks that each teacher only sees their own students.
