@@ -1,0 +1,7 @@
+{
+  "name": "teacher-grade-api",
+  "main": "src/index.js",
+  "compatibility_date": "2026-09-01",
+  "compatibility_flags": ["nodejs_compat"]
+  // Database connection: a Hyperdrive binding named HYPERDRIVE, or a DATABASE_URL secret.
+}
